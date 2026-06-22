@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "engine" / "opentyre_lca"))
 
 import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
 
 from opentyre_lca import (
@@ -48,7 +49,7 @@ st.markdown(
         font-size: 0.85rem;
     }
     div[data-testid="stMetricValue"] {
-        font-size: 1.65rem;
+        font-size: 1.55rem;
     }
     </style>
     """,
@@ -60,6 +61,120 @@ st.markdown(
     '<div class="subtitle">Open engineering LCI/LCA dashboard for end-of-life tyre pyrolysis, recovered carbon black, deashing and circular carbon accounting.</div>',
     unsafe_allow_html=True,
 )
+
+
+# ------------------------------------------------------------
+# Helper functions
+# ------------------------------------------------------------
+
+def make_sankey(result: dict, include_deashing: bool, include_oil: bool) -> go.Figure:
+    """Create simple material-credit Sankey for the current case."""
+
+    raw_rcb = result["raw_rcb_tpy"]
+    purified_rcb = result["purified_rcb_tpy"]
+    cb_product = result["cb_product_for_substitution_tpy"]
+    virgin_avoided = result["virgin_cb_avoided_tpy"]
+
+    burden = result["gross_burdens_tco2e_per_year"]
+    credit = result["gross_credits_tco2e_per_year"]
+    saving = max(result["net_saving_tco2e_per_year"], 0)
+
+    labels = [
+        "ELT feed",
+        "Tyre pyrolysis",
+        "Raw rCB",
+        "rCB product",
+        "Virgin CB avoided",
+        "Gross burdens",
+        "Gross credits",
+        "Net saving",
+    ]
+
+    source = [0, 1, 2, 3, 1, 4, 5, 6]
+    target = [1, 2, 3, 4, 5, 6, 7, 7]
+    value = [
+        result["annual_elt_t"],
+        raw_rcb,
+        cb_product,
+        virgin_avoided,
+        burden,
+        credit,
+        burden,
+        saving,
+    ]
+
+    if include_deashing:
+        labels.insert(3, "Deashing")
+        labels.insert(4, "Purified rCB")
+
+        # Rebuild with deashing path
+        source = [0, 1, 2, 3, 4, 5, 1, 6, 7, 8]
+        target = [1, 2, 3, 4, 5, 6, 7, 8, 9, 9]
+        value = [
+            result["annual_elt_t"],
+            raw_rcb,
+            result["deashing_feed_tpy"],
+            purified_rcb,
+            cb_product,
+            virgin_avoided,
+            burden,
+            credit,
+            burden,
+            saving,
+        ]
+
+        labels = [
+            "ELT feed",
+            "Tyre pyrolysis",
+            "Raw rCB",
+            "Deashing",
+            "Purified rCB",
+            "rCB product",
+            "Virgin CB avoided",
+            "Gross burdens",
+            "Gross credits",
+            "Net saving",
+        ]
+
+    if include_oil:
+        labels.append("Oil credit included")
+
+    fig = go.Figure(
+        data=[
+            go.Sankey(
+                arrangement="snap",
+                node=dict(
+                    pad=18,
+                    thickness=18,
+                    line=dict(width=0.4),
+                    label=labels,
+                ),
+                link=dict(
+                    source=source,
+                    target=target,
+                    value=value,
+                ),
+            )
+        ]
+    )
+
+    fig.update_layout(
+        title_text="Material and climate-credit flow",
+        font_size=12,
+        height=520,
+        margin=dict(l=10, r=10, t=50, b=10),
+    )
+    return fig
+
+
+def make_waterfall_like_df(lci_df: pd.DataFrame) -> pd.DataFrame:
+    """Prepare ordered contribution table for charting."""
+    df = lci_df.copy()
+    if df.empty:
+        return df
+    df["absolute_impact"] = df["impact_tco2e_per_year"].abs()
+    df = df.sort_values("absolute_impact", ascending=False)
+    return df
 
 
 # ------------------------------------------------------------
@@ -153,7 +268,7 @@ with st.sidebar:
 
 
 # ------------------------------------------------------------
-# Build base params
+# Build case
 # ------------------------------------------------------------
 
 params = workbook_base_case(
@@ -186,7 +301,7 @@ contrib_df = pd.DataFrame(contribution_records(params, group_by="stage"))
 
 
 # ------------------------------------------------------------
-# Header KPIs
+# KPI row
 # ------------------------------------------------------------
 
 k1, k2, k3, k4, k5 = st.columns(5)
@@ -199,7 +314,7 @@ k5.metric("Saving intensity", f"{result['net_saving_tco2e_per_t_elt']:.3f} tCOâ‚
 
 
 # ------------------------------------------------------------
-# Scenario generation
+# Scenarios
 # ------------------------------------------------------------
 
 scenario_definitions = {
@@ -246,8 +361,8 @@ scenario_df = pd.DataFrame(run_scenarios(params, scenario_definitions))
 # Tabs
 # ------------------------------------------------------------
 
-tab_overview, tab_scenarios, tab_lci, tab_method = st.tabs(
-    ["Overview", "Scenarios", "LCI table", "Methodology"]
+tab_overview, tab_flow, tab_scenarios, tab_lci, tab_excel, tab_method = st.tabs(
+    ["Overview", "Flow Sankey", "Scenarios", "LCI table", "Excel import", "Methodology"]
 )
 
 
@@ -257,8 +372,7 @@ with tab_overview:
     with left:
         st.subheader("Life-cycle contribution by stage")
         if not contrib_df.empty:
-            chart_df = contrib_df.set_index("stage")[["impact_tco2e_per_year"]]
-            st.bar_chart(chart_df)
+            st.bar_chart(contrib_df.set_index("stage")[["impact_tco2e_per_year"]])
         else:
             st.info("No contribution data available.")
 
@@ -278,6 +392,11 @@ with tab_overview:
 
     st.divider()
 
+    st.subheader("Top LCI contributors")
+    top_df = make_waterfall_like_df(lci_df).head(10)
+    if not top_df.empty:
+        st.bar_chart(top_df.set_index("item")[["impact_tco2e_per_year"]])
+
     st.subheader("Key calculated values")
     summary_rows = {
         "Annual ELT feed, t/y": result["annual_elt_t"],
@@ -292,11 +411,21 @@ with tab_overview:
         "Net saving, tCOâ‚‚e/t ELT": result["net_saving_tco2e_per_t_elt"],
     }
     st.dataframe(
-        pd.DataFrame(
-            [{"metric": key, "value": value} for key, value in summary_rows.items()]
-        ),
+        pd.DataFrame([{"metric": k, "value": v} for k, v in summary_rows.items()]),
         use_container_width=True,
         hide_index=True,
+    )
+
+
+with tab_flow:
+    st.subheader("Material and climate-credit flow")
+    st.plotly_chart(
+        make_sankey(result, include_deashing=include_deashing, include_oil=include_oil),
+        use_container_width=True,
+    )
+
+    st.info(
+        "The Sankey is a screening visualisation. It mixes material flows and climate-credit magnitudes, so it should be used for communication, not as a strict physical balance diagram."
     )
 
 
@@ -321,15 +450,11 @@ with tab_scenarios:
 
     with c1:
         st.markdown("#### Net saving by scenario")
-        st.bar_chart(
-            scenario_view.set_index("case")[["net_saving_tco2e_per_year"]]
-        )
+        st.bar_chart(scenario_view.set_index("case")[["net_saving_tco2e_per_year"]])
 
     with c2:
         st.markdown("#### Saving intensity by scenario")
-        st.bar_chart(
-            scenario_view.set_index("case")[["net_saving_tco2e_per_t_elt"]]
-        )
+        st.bar_chart(scenario_view.set_index("case")[["net_saving_tco2e_per_t_elt"]])
 
     st.download_button(
         "Download scenario results as CSV",
@@ -342,13 +467,15 @@ with tab_scenarios:
 with tab_lci:
     st.subheader("Life-cycle inventory")
 
-    filter_stage = st.multiselect(
-        "Filter by stage",
-        options=sorted(lci_df["stage"].unique()) if not lci_df.empty else [],
-        default=sorted(lci_df["stage"].unique()) if not lci_df.empty else [],
-    )
-
-    filtered_lci = lci_df[lci_df["stage"].isin(filter_stage)] if filter_stage else lci_df
+    if not lci_df.empty:
+        filter_stage = st.multiselect(
+            "Filter by stage",
+            options=sorted(lci_df["stage"].unique()),
+            default=sorted(lci_df["stage"].unique()),
+        )
+        filtered_lci = lci_df[lci_df["stage"].isin(filter_stage)] if filter_stage else lci_df
+    else:
+        filtered_lci = lci_df
 
     st.dataframe(filtered_lci, use_container_width=True, hide_index=True)
 
@@ -359,12 +486,43 @@ with tab_lci:
         mime="text/csv",
     )
 
-    st.subheader("Top LCI contributors")
-    top_lci = filtered_lci.copy()
-    if not top_lci.empty:
-        top_lci["absolute_impact"] = top_lci["impact_tco2e_per_year"].abs()
-        top_lci = top_lci.sort_values("absolute_impact", ascending=False).head(10)
-        st.bar_chart(top_lci.set_index("item")[["impact_tco2e_per_year"]])
+
+with tab_excel:
+    st.subheader("Excel workbook import / preview")
+
+    uploaded = st.file_uploader(
+        "Upload LCA workbook (.xlsx)",
+        type=["xlsx"],
+        help="This first version previews sheets. Later we will map exact workbook cells into model inputs.",
+    )
+
+    if uploaded is None:
+        st.info("Upload your LCA workbook to inspect sheets and preview data.")
+    else:
+        try:
+            xls = pd.ExcelFile(uploaded)
+            st.success(f"Workbook loaded. Sheets found: {len(xls.sheet_names)}")
+
+            selected_sheet = st.selectbox("Select sheet", xls.sheet_names)
+            preview_df = pd.read_excel(uploaded, sheet_name=selected_sheet, nrows=50)
+
+            st.markdown("#### Sheet preview")
+            st.dataframe(preview_df, use_container_width=True)
+
+            sheet_summary = pd.DataFrame(
+                {
+                    "sheet": xls.sheet_names,
+                }
+            )
+            st.markdown("#### Workbook sheet list")
+            st.dataframe(sheet_summary, use_container_width=True, hide_index=True)
+
+            st.warning(
+                "Next development step: map known workbook sheets such as summary, ELT, LCI-inventory and deashing directly into TyreLCAParams."
+            )
+
+        except Exception as exc:
+            st.error(f"Could not read workbook: {exc}")
 
 
 with tab_method:
@@ -395,6 +553,8 @@ with tab_method:
         - Optional pyrolysis oil substitution credit
         - Optional rCB deashing / demineralisation
         - Optional zinc recovery credit
+        - Excel workbook preview
+        - Sankey-style flow visualisation
         """
     )
 
