@@ -1,0 +1,5 @@
+Metadata-Version: 2.4
+Name: opentyre-lca
+Version: 0.1.0
+Summary: Tyre pyrolysis LCI/LCA calculation engine
+Requires-Python: >=3.11
