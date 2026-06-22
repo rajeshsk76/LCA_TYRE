@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+*.log
+.DS_Store
+.pytest_cache/
+reports/generated/
+data/private/
+.streamlit/secrets.toml

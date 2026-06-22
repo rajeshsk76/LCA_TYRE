@@ -1,0 +1,9 @@
+key,name,region,unit,impact_category,factor_kgco2e_per_unit,source,license,notes
+virgin_carbon_black,Virgin carbon black,GLO,kg,GWP100,2.37,placeholder,to_verify,Replace with verified LCI/EPD
+raw_rcb_pyrolysis,Raw recovered carbon black production,NOR,kg,GWP100,0.605,placeholder,to_verify,Allocated burden per kg raw rCB
+nitric_acid,Nitric acid,GLO,kg,GWP100,2.50,placeholder,to_verify,Replace with verified LCI
+sodium_hydroxide,Sodium hydroxide,GLO,kg,GWP100,1.97,placeholder,to_verify,Replace with verified LCI
+electricity,Electricity grid,NOR,kWh,GWP100,0.0181,placeholder,to_verify,Norway electricity placeholder
+water_supply,Fresh water supply,GLO,m3,GWP100,0.066,placeholder,to_verify,Replace with local factor
+wastewater_treatment,Wastewater treatment,GLO,m3,GWP100,0.55,placeholder,to_verify,Replace with local factor
+zinc_oxide,Zinc oxide production,GLO,kg,GWP100,2.89,placeholder,to_verify,Optional zinc credit

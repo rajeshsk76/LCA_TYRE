@@ -1,0 +1,1 @@
+# Methodology\n\nOpen engineering LCI/LCA model. Initial category: GWP100.\n

@@ -1,0 +1,1 @@
+# Assumptions\n\nAll emission factors are placeholders unless verified.\n

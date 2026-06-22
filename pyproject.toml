@@ -1,0 +1,10 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lca-tyre"
+version = "0.1.0"
+description = "Open engineering LCI/LCA platform for end-of-life tyre pyrolysis and recovered carbon black"
+readme = "README.md"
+requires-python = ">=3.11"

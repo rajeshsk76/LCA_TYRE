@@ -1,0 +1,2 @@
+route_id,origin,destination,mode,distance_km,mass_t,ef_kgco2e_per_tkm,source,notes
+placeholder,Norway,TBD,ship,0,62500,0,placeholder,to update

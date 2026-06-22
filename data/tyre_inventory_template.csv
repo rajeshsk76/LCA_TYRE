@@ -1,0 +1,3 @@
+parameter,value,unit,source,notes
+annual_elt_feed,62500,t/year,engineering_model,base value
+raw_rcb_yield,0.35,t/t ELT,engineering_model,base value
