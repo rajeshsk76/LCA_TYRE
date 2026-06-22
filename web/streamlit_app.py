@@ -18,6 +18,7 @@ from opentyre_lca import (
     run_scenarios,
 )
 from opentyre_lca.tyre_model import update_params
+from opentyre_lca.reporting import build_customer_workbook
 
 
 # ------------------------------------------------------------
@@ -354,7 +355,28 @@ scenario_definitions = {
     },
 }
 
+
 scenario_df = pd.DataFrame(run_scenarios(params, scenario_definitions))
+
+# ------------------------------------------------------------
+# Customer Excel report export
+# ------------------------------------------------------------
+
+report_bytes = build_customer_workbook(
+    params,
+    scenario_definitions=scenario_definitions,
+    customer_name="Customer",
+    project_name="End-of-life tyre LCA screening",
+    prepared_by="LCA_TYRE / Calvyx",
+)
+
+st.download_button(
+    label="📥 Download customer Excel report",
+    data=report_bytes,
+    file_name="LCA_TYRE_customer_report.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+)
+
 
 
 # ------------------------------------------------------------
