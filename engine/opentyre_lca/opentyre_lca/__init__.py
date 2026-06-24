@@ -11,3 +11,8 @@ from .tyre_model import (
     run_scenarios,
     workbook_base_case,
 )
+
+from .sensitivity import (
+    DEFAULT_SENSITIVITY_PARAMETERS,
+    run_one_at_a_time_sensitivity,
+)
